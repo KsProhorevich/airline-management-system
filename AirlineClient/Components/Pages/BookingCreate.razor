@@ -1,0 +1,93 @@
+@page "/bookings/new"
+@inject AirlineApiClient Api
+@inject AuthSession Session
+@inject NavigationManager Navigation
+
+<PageTitle>Новое бронирование</PageTitle>
+<h1>Новое бронирование</h1>
+@if (!Session.IsAuthenticated)
+{
+    <p><a href="/login">Войдите</a>, чтобы оформить бронирование.</p>
+}
+else
+{
+    <StatusNote Message="@_message" />
+    <EditForm Model="_form" OnValidSubmit="Save">
+        <DataAnnotationsValidator />
+        <ValidationSummary />
+        <label>Рейс
+            <InputSelect @bind-Value="_form.FlightId">
+                <option value="">Выберите рейс</option>
+                @foreach (var flight in _flights)
+                {
+                    <option value="@flight.Id">@flight.FlightNumber @flight.DepartureAirport-@flight.ArrivalAirport, свободно @flight.AvailableSeats</option>
+                }
+            </InputSelect>
+        </label>
+        <label>Мест <InputNumber @bind-Value="_form.SeatCount" /></label>
+        @if (Session.IsDispatcher)
+        {
+            <label>Пассажир
+                <InputSelect @bind-Value="_form.PassengerId">
+                    <option value="">Выберите пассажира</option>
+                    @foreach (var passenger in _passengers)
+                    {
+                        <option value="@passenger.Id">@passenger.FullName (@passenger.Email)</option>
+                    }
+                </InputSelect>
+            </label>
+        }
+        <button type="submit">Забронировать</button>
+    </EditForm>
+}
+
+@code {
+    private readonly BookingForm _form = new();
+    private List<FlightItem> _flights = [];
+    private List<PassengerItem> _passengers = [];
+    private string? _message;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await Session.LoadAsync();
+        if (!Session.IsAuthenticated)
+        {
+            return;
+        }
+
+        try
+        {
+            var flights = await Api.ListFlightsAsync(1, 50, null, null, null, "departureTime", "asc", CancellationToken.None);
+            _flights = flights.Items;
+            if (Session.IsDispatcher)
+            {
+                var passengers = await Api.ListPassengersAsync(null, CancellationToken.None);
+                _passengers = passengers.Items;
+            }
+        }
+        catch (ApiCallException exception)
+        {
+            _message = exception.Message;
+        }
+    }
+
+    private async Task Save()
+    {
+        var errors = BookingFormRules.Validate(_form.SeatCount, _form.PassengerId, Session.IsDispatcher);
+        if (errors.Count > 0)
+        {
+            _message = string.Join(" ", errors);
+            return;
+        }
+
+        try
+        {
+            var created = await Api.CreateBookingAsync(_form, CancellationToken.None);
+            Navigation.NavigateTo($"/bookings/{created.Id}");
+        }
+        catch (ApiCallException exception)
+        {
+            _message = exception.Message;
+        }
+    }
+}

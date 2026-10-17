@@ -1,0 +1,42 @@
+@page "/login"
+@inject AirlineApiClient Api
+@inject AuthSession Session
+@inject NavigationManager Navigation
+
+<PageTitle>Вход</PageTitle>
+<h1>Вход</h1>
+<StatusNote Message="@_error" />
+<EditForm Model="_form" OnValidSubmit="Submit">
+    <DataAnnotationsValidator />
+    <ValidationSummary />
+    <label>Email <InputText @bind-Value="_form.Email" /></label>
+    <label>Пароль <InputText type="password" @bind-Value="_form.Password" /></label>
+    <button type="submit" disabled="@_busy">@(_busy ? "Вход..." : "Войти")</button>
+</EditForm>
+
+@code {
+    private readonly LoginForm _form = new();
+    private string? _error;
+    private bool _busy;
+
+    private async Task Submit()
+    {
+        _busy = true;
+        _error = null;
+        try
+        {
+            var result = await Api.LoginAsync(_form, CancellationToken.None);
+            _form.Password = "";
+            await Session.SignInAsync(result);
+            Navigation.NavigateTo(result.User.Role == "Dispatcher" ? "/flights" : "/bookings");
+        }
+        catch (ApiCallException exception)
+        {
+            _error = exception.Message;
+        }
+        finally
+        {
+            _busy = false;
+        }
+    }
+}

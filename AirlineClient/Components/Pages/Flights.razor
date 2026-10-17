@@ -1,0 +1,140 @@
+@page "/flights"
+@inject AirlineApiClient Api
+@inject AuthSession Session
+
+<PageTitle>Рейсы</PageTitle>
+<h1>Рейсы</h1>
+@if (Session.IsDispatcher)
+{
+    <p><a href="/flights/new">Создать рейс</a></p>
+}
+<EditForm Model="_filter" OnSubmit="Reload">
+    <label>Вылет <InputText @bind-Value="_filter.Departure" /></label>
+    <label>Прилёт <InputText @bind-Value="_filter.Arrival" /></label>
+    <label>Статус
+        <InputSelect @bind-Value="_filter.Status">
+            <option value="">Все</option>
+            <option value="Scheduled">Запланирован</option>
+            <option value="Delayed">Задержан</option>
+            <option value="Boarding">Посадка</option>
+            <option value="Departed">Вылетел</option>
+            <option value="Arrived">Прибыл</option>
+            <option value="Cancelled">Отменён</option>
+        </InputSelect>
+    </label>
+    <label>Сортировка
+        <InputSelect @bind-Value="_filter.SortBy">
+            <option value="departureTime">Время вылета</option>
+            <option value="arrivalTime">Время прилёта</option>
+            <option value="flightNumber">Номер</option>
+        </InputSelect>
+    </label>
+    <label>Порядок
+        <InputSelect @bind-Value="_filter.SortDir">
+            <option value="asc">По возрастанию</option>
+            <option value="desc">По убыванию</option>
+        </InputSelect>
+    </label>
+    <button type="submit">Применить</button>
+</EditForm>
+<StatusNote Message="@_message" />
+@if (_loading)
+{
+    <p>Загрузка рейсов...</p>
+}
+else if (_page is null || _page.Items.Count == 0)
+{
+    <p>Рейсы не найдены.</p>
+}
+else
+{
+    <table>
+        <thead>
+            <tr><th>Номер</th><th>Маршрут</th><th>Вылет</th><th>Статус</th><th>Места</th><th>Самолёт</th><th></th></tr>
+        </thead>
+        <tbody>
+            @foreach (var flight in _page.Items)
+            {
+                <tr>
+                    <td><a href="@($"/flights/{flight.Id}")">@flight.FlightNumber</a></td>
+                    <td>@flight.DepartureAirport → @flight.ArrivalAirport</td>
+                    <td>@flight.DepartureTime.ToString("u")</td>
+                    <td>@flight.Status</td>
+                    <td>@flight.AvailableSeats / @flight.TotalSeats</td>
+                    <td>@flight.AircraftRegistration</td>
+                    <td>
+                        @if (Session.IsDispatcher)
+                        {
+                            <a href="@($"/flights/{flight.Id}/edit")">Изменить</a>
+                            <button type="button" @onclick="() => Delete(flight.Id)">Удалить</button>
+                        }
+                    </td>
+                </tr>
+            }
+        </tbody>
+    </table>
+    <Pager Page="_page.Page" TotalPages="_page.TotalPages" PageChanged="ChangePage" />
+}
+
+@code {
+    private readonly Filter _filter = new();
+    private PagedResult<FlightItem>? _page;
+    private string? _message;
+    private bool _loading = true;
+    private int _currentPage = 1;
+
+    protected override async Task OnInitializedAsync() => await Load();
+
+    private async Task Reload()
+    {
+        _currentPage = 1;
+        await Load();
+    }
+
+    private async Task ChangePage(int page)
+    {
+        _currentPage = page;
+        await Load();
+    }
+
+    private async Task Load()
+    {
+        _loading = true;
+        _message = null;
+        try
+        {
+            _page = await Api.ListFlightsAsync(_currentPage, 10, _filter.Departure, _filter.Arrival, _filter.Status, _filter.SortBy, _filter.SortDir, CancellationToken.None);
+        }
+        catch (ApiCallException exception)
+        {
+            _message = exception.Message;
+            _page = null;
+        }
+        finally
+        {
+            _loading = false;
+        }
+    }
+
+    private async Task Delete(Guid id)
+    {
+        try
+        {
+            await Api.DeleteFlightAsync(id, CancellationToken.None);
+            await Load();
+        }
+        catch (ApiCallException exception)
+        {
+            _message = exception.Message;
+        }
+    }
+
+    private sealed class Filter
+    {
+        public string? Departure { get; set; }
+        public string? Arrival { get; set; }
+        public string? Status { get; set; }
+        public string SortBy { get; set; } = "departureTime";
+        public string SortDir { get; set; } = "asc";
+    }
+}

@@ -1,0 +1,72 @@
+@page "/aircraft/new"
+@page "/aircraft/{Id:guid}/edit"
+@inject AirlineApiClient Api
+@inject AuthSession Session
+@inject NavigationManager Navigation
+
+<PageTitle>Самолёт</PageTitle>
+<h1>@(_id is null ? "Новое судно" : "Изменение судна")</h1>
+@if (!Session.IsDispatcher)
+{
+    <p>Изменять парк может только диспетчер.</p>
+}
+<StatusNote Message="@_message" />
+<EditForm Model="_form" OnValidSubmit="Save">
+    <DataAnnotationsValidator />
+    <ValidationSummary />
+    <label>Регистрация <InputText @bind-Value="_form.Registration" /></label>
+    <label>Модель <InputText @bind-Value="_form.Model" /></label>
+    <label>Вместимость <InputNumber @bind-Value="_form.SeatCapacity" /></label>
+    <button type="submit">Сохранить</button>
+</EditForm>
+
+@code {
+    [Parameter]
+    public Guid? Id { get; set; }
+
+    private Guid? _id;
+    private readonly AircraftForm _form = new();
+    private string? _message;
+
+    protected override async Task OnParametersSetAsync()
+    {
+        _id = Id == Guid.Empty ? null : Id;
+        if (_id is not Guid id)
+        {
+            return;
+        }
+
+        try
+        {
+            var aircraft = await Api.GetAircraftAsync(id, CancellationToken.None);
+            _form.Registration = aircraft.Registration;
+            _form.Model = aircraft.Model;
+            _form.SeatCapacity = aircraft.SeatCapacity;
+        }
+        catch (ApiCallException exception)
+        {
+            _message = exception.Message;
+        }
+    }
+
+    private async Task Save()
+    {
+        try
+        {
+            if (_id is Guid id)
+            {
+                await Api.UpdateAircraftAsync(id, _form, CancellationToken.None);
+            }
+            else
+            {
+                await Api.CreateAircraftAsync(_form, CancellationToken.None);
+            }
+
+            Navigation.NavigateTo("/aircraft");
+        }
+        catch (ApiCallException exception)
+        {
+            _message = exception.Message;
+        }
+    }
+}

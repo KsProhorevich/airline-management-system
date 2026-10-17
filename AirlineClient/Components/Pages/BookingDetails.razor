@@ -1,0 +1,56 @@
+@page "/bookings/{Id:guid}"
+@inject AirlineApiClient Api
+@inject NavigationManager Navigation
+
+<PageTitle>Бронирование</PageTitle>
+<h1>Бронирование</h1>
+<StatusNote Message="@_message" />
+@if (_item is not null)
+{
+    <dl>
+        <dt>Рейс</dt><dd>@_item.FlightNumber</dd>
+        <dt>Пассажир</dt><dd>@_item.PassengerName (@_item.PassengerEmail)</dd>
+        <dt>Места</dt><dd>@_item.SeatCount</dd>
+        <dt>Статус</dt><dd>@_item.Status</dd>
+        <dt>Создано</dt><dd>@_item.CreatedAt.ToString("u")</dd>
+    </dl>
+    @if (_item.Status != "Cancelled")
+    {
+        <button type="button" @onclick="Cancel">Отменить бронирование</button>
+    }
+}
+
+@code {
+    [Parameter]
+    public Guid Id { get; set; }
+
+    private BookingItem? _item;
+    private string? _message;
+
+    protected override async Task OnParametersSetAsync() => await Load();
+
+    private async Task Load()
+    {
+        try
+        {
+            _item = await Api.GetBookingAsync(Id, CancellationToken.None);
+        }
+        catch (ApiCallException exception)
+        {
+            _message = exception.Message;
+        }
+    }
+
+    private async Task Cancel()
+    {
+        try
+        {
+            await Api.CancelBookingAsync(Id, CancellationToken.None);
+            await Load();
+        }
+        catch (ApiCallException exception)
+        {
+            _message = exception.Message;
+        }
+    }
+}

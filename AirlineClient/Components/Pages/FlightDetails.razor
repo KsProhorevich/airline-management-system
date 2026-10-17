@@ -1,0 +1,51 @@
+@page "/flights/{Id:guid}"
+@inject AirlineApiClient Api
+
+<PageTitle>Рейс</PageTitle>
+<h1>Рейс</h1>
+<StatusNote Message="@_message" />
+@if (_loading)
+{
+    <p>Загрузка...</p>
+}
+else if (_flight is not null)
+{
+    <dl>
+        <dt>Номер</dt><dd>@_flight.FlightNumber</dd>
+        <dt>Маршрут</dt><dd>@_flight.DepartureAirport → @_flight.ArrivalAirport</dd>
+        <dt>Вылет</dt><dd>@_flight.DepartureTime.ToString("u")</dd>
+        <dt>Прилёт</dt><dd>@_flight.ArrivalTime.ToString("u")</dd>
+        <dt>Статус</dt><dd>@_flight.Status</dd>
+        <dt>Места</dt><dd>@_flight.AvailableSeats / @_flight.TotalSeats</dd>
+        <dt>Самолёт</dt><dd>@_flight.AircraftRegistration @_flight.AircraftModel</dd>
+    </dl>
+    <p><a href="/bookings/new">Забронировать</a></p>
+}
+
+@code {
+    [Parameter]
+    public Guid Id { get; set; }
+
+    private FlightItem? _flight;
+    private string? _message;
+    private bool _loading = true;
+
+    protected override async Task OnParametersSetAsync()
+    {
+        _loading = true;
+        _message = null;
+        try
+        {
+            _flight = await Api.GetFlightAsync(Id, CancellationToken.None);
+        }
+        catch (ApiCallException exception)
+        {
+            _message = exception.Message;
+            _flight = null;
+        }
+        finally
+        {
+            _loading = false;
+        }
+    }
+}

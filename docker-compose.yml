@@ -1,0 +1,45 @@
+services:
+  api:
+    build:
+      context: .
+      dockerfile: AirlineApi/Dockerfile
+    ports:
+      - "5080:8080"
+    environment:
+      ASPNETCORE_ENVIRONMENT: Development
+      ASPNETCORE_URLS: http://+:8080
+      ConnectionStrings__DefaultConnection: Data Source=/data/airline.db
+      Jwt__Issuer: AirlineApi
+      Jwt__Audience: AirlineApiClients
+      Jwt__SigningKey: ${JWT_SIGNING_KEY:?Задайте JWT_SIGNING_KEY в окружении или файле .env}
+      Jwt__AccessTokenMinutes: "60"
+      Admin__Email: ${ADMIN_EMAIL:-}
+      Admin__Password: ${ADMIN_PASSWORD:-}
+      Admin__FullName: ${ADMIN_FULL_NAME:-Диспетчер}
+      Database__ApplyMigrationsOnStartup: "true"
+      Database__SeedSampleData: "true"
+    volumes:
+      - airline-data:/data
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 8
+      start_period: 20s
+
+  client:
+    build:
+      context: .
+      dockerfile: AirlineClient/Dockerfile
+    ports:
+      - "5081:8080"
+    environment:
+      ASPNETCORE_ENVIRONMENT: Development
+      ASPNETCORE_URLS: http://+:8080
+      Api__BaseUrl: http://api:8080
+    depends_on:
+      api:
+        condition: service_healthy
+
+volumes:
+  airline-data:

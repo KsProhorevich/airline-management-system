@@ -1,0 +1,71 @@
+﻿@inherits LayoutComponentBase
+@inject AuthSession Session
+@inject NavigationManager Navigation
+
+<header class="topbar">
+    <a class="brand" href="/">Авиакомпания</a>
+    <nav>
+        <a href="/flights">Рейсы</a>
+        <a href="/aircraft">Самолёты</a>
+        @if (Session.IsAuthenticated)
+        {
+            <a href="/bookings">Бронирования</a>
+        }
+        @if (Session.IsDispatcher)
+        {
+            <a href="/passengers">Пассажиры</a>
+        }
+    </nav>
+    <div class="account">
+        @if (Session.IsAuthenticated)
+        {
+            <span>@Session.FullName (@(Session.IsDispatcher ? "диспетчер" : "пассажир"))</span>
+            <button type="button" @onclick="Logout">Выйти</button>
+        }
+        else
+        {
+            <a href="/login">Войти</a>
+            <a href="/register">Регистрация</a>
+        }
+    </div>
+</header>
+<main>
+    <div @key="_renderKey">
+        @Body
+    </div>
+</main>
+
+<div id="blazor-error-ui">
+    Произошла необработанная ошибка.
+    <a href="" class="reload">Обновить</a>
+    <a class="dismiss">🗙</a>
+</div>
+
+@code {
+    private int _renderKey;
+
+    protected override void OnInitialized()
+    {
+        Session.Changed += () =>
+        {
+            _renderKey++;
+            _ = InvokeAsync(StateHasChanged);
+        };
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            await Session.LoadAsync();
+            _renderKey++;
+            StateHasChanged();
+        }
+    }
+
+    private async Task Logout()
+    {
+        await Session.ClearAsync();
+        Navigation.NavigateTo("/login");
+    }
+}

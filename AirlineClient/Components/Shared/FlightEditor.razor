@@ -1,0 +1,46 @@
+<EditForm Model="Model" OnValidSubmit="Submit">
+    <DataAnnotationsValidator />
+    <ValidationSummary />
+    <label>Номер рейса <InputText @bind-Value="Model.FlightNumber" /></label>
+    <label>Вылет <InputText @bind-Value="Model.DepartureAirport" /></label>
+    <label>Прилёт <InputText @bind-Value="Model.ArrivalAirport" /></label>
+    <label>Время вылета (UTC) <InputDate Type="InputDateType.DateTimeLocal" @bind-Value="Model.DepartureTime" /></label>
+    <label>Время прилёта (UTC) <InputDate Type="InputDateType.DateTimeLocal" @bind-Value="Model.ArrivalTime" /></label>
+    <label>Статус
+        <InputSelect @bind-Value="Model.Status">
+            <option value="Scheduled">Запланирован</option>
+            <option value="Delayed">Задержан</option>
+            <option value="Boarding">Посадка</option>
+            <option value="Departed">Вылетел</option>
+            <option value="Arrived">Прибыл</option>
+            <option value="Cancelled">Отменён</option>
+        </InputSelect>
+    </label>
+    <label>Мест <InputNumber @bind-Value="Model.TotalSeats" /></label>
+    <label>Самолёт
+        <InputSelect @bind-Value="Model.AircraftId">
+            <option value="">Резервное судно</option>
+            @foreach (var aircraft in Aircraft)
+            {
+                <option value="@aircraft.Id">@aircraft.Registration — @aircraft.Model</option>
+            }
+        </InputSelect>
+    </label>
+    <button type="submit">@SubmitText</button>
+</EditForm>
+
+@code {
+    [Parameter]
+    public FlightForm Model { get; set; } = new();
+
+    [Parameter]
+    public IReadOnlyList<AircraftItem> Aircraft { get; set; } = [];
+
+    [Parameter]
+    public string SubmitText { get; set; } = "Сохранить";
+
+    [Parameter]
+    public EventCallback<FlightForm> OnSave { get; set; }
+
+    private Task Submit() => OnSave.InvokeAsync(Model);
+}

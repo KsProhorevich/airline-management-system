@@ -1,0 +1,85 @@
+@page "/flights/new"
+@page "/flights/{Id:guid}/edit"
+@inject AirlineApiClient Api
+@inject AuthSession Session
+@inject NavigationManager Navigation
+
+<PageTitle>Рейс</PageTitle>
+<h1>@(_id is null ? "Новый рейс" : "Изменение рейса")</h1>
+@if (!Session.IsDispatcher)
+{
+    <p>Создавать и изменять рейсы может только диспетчер. Сервер отклонит запрос, даже если эта страница открыта напрямую.</p>
+}
+<StatusNote Message="@_message" />
+@if (_loading)
+{
+    <p>Загрузка...</p>
+}
+else
+{
+    <FlightEditor Model="_form" Aircraft="_aircraft" SubmitText="Сохранить" OnSave="Save" />
+}
+
+@code {
+    [Parameter]
+    public Guid? Id { get; set; }
+
+    private Guid? _id;
+    private readonly FlightForm _form = new();
+    private List<AircraftItem> _aircraft = [];
+    private string? _message;
+    private bool _loading = true;
+
+    protected override async Task OnParametersSetAsync()
+    {
+        _id = Id == Guid.Empty ? null : Id;
+        _loading = true;
+        _message = null;
+        try
+        {
+            var aircraftPage = await Api.ListAircraftAsync(1, 50, CancellationToken.None);
+            _aircraft = aircraftPage.Items;
+            if (_id is Guid id)
+            {
+                var flight = await Api.GetFlightAsync(id, CancellationToken.None);
+                _form.FlightNumber = flight.FlightNumber;
+                _form.DepartureAirport = flight.DepartureAirport;
+                _form.ArrivalAirport = flight.ArrivalAirport;
+                _form.DepartureTime = flight.DepartureTime;
+                _form.ArrivalTime = flight.ArrivalTime;
+                _form.Status = flight.Status;
+                _form.TotalSeats = flight.TotalSeats;
+                _form.AircraftId = flight.AircraftId;
+            }
+        }
+        catch (ApiCallException exception)
+        {
+            _message = exception.Message;
+        }
+        finally
+        {
+            _loading = false;
+        }
+    }
+
+    private async Task Save(FlightForm form)
+    {
+        try
+        {
+            if (_id is Guid id)
+            {
+                await Api.UpdateFlightAsync(id, form, CancellationToken.None);
+            }
+            else
+            {
+                await Api.CreateFlightAsync(form, CancellationToken.None);
+            }
+
+            Navigation.NavigateTo("/flights");
+        }
+        catch (ApiCallException exception)
+        {
+            _message = exception.Message;
+        }
+    }
+}

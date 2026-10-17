@@ -1,0 +1,89 @@
+@page "/aircraft"
+@inject AirlineApiClient Api
+@inject AuthSession Session
+
+<PageTitle>Самолёты</PageTitle>
+<h1>Самолёты</h1>
+@if (Session.IsDispatcher)
+{
+    <p><a href="/aircraft/new">Добавить судно</a></p>
+}
+<StatusNote Message="@_message" />
+@if (_loading)
+{
+    <p>Загрузка...</p>
+}
+else if (_page is null || _page.Items.Count == 0)
+{
+    <p>Судна не найдены.</p>
+}
+else
+{
+    <table>
+        <thead><tr><th>Регистрация</th><th>Модель</th><th>Вместимость</th><th></th></tr></thead>
+        <tbody>
+            @foreach (var aircraft in _page.Items)
+            {
+                <tr>
+                    <td><a href="@($"/aircraft/{aircraft.Id}")">@aircraft.Registration</a></td>
+                    <td>@aircraft.Model</td>
+                    <td>@aircraft.SeatCapacity</td>
+                    <td>
+                        @if (Session.IsDispatcher)
+                        {
+                            <a href="@($"/aircraft/{aircraft.Id}/edit")">Изменить</a>
+                            <button type="button" @onclick="() => Delete(aircraft.Id)">Удалить</button>
+                        }
+                    </td>
+                </tr>
+            }
+        </tbody>
+    </table>
+    <Pager Page="_page.Page" TotalPages="_page.TotalPages" PageChanged="ChangePage" />
+}
+
+@code {
+    private PagedResult<AircraftItem>? _page;
+    private string? _message;
+    private bool _loading = true;
+    private int _currentPage = 1;
+
+    protected override async Task OnInitializedAsync() => await Load();
+
+    private async Task ChangePage(int page)
+    {
+        _currentPage = page;
+        await Load();
+    }
+
+    private async Task Load()
+    {
+        _loading = true;
+        _message = null;
+        try
+        {
+            _page = await Api.ListAircraftAsync(_currentPage, 10, CancellationToken.None);
+        }
+        catch (ApiCallException exception)
+        {
+            _message = exception.Message;
+        }
+        finally
+        {
+            _loading = false;
+        }
+    }
+
+    private async Task Delete(Guid id)
+    {
+        try
+        {
+            await Api.DeleteAircraftAsync(id, CancellationToken.None);
+            await Load();
+        }
+        catch (ApiCallException exception)
+        {
+            _message = exception.Message;
+        }
+    }
+}

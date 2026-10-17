@@ -1,0 +1,44 @@
+@page "/register"
+@inject AirlineApiClient Api
+@inject AuthSession Session
+@inject NavigationManager Navigation
+
+<PageTitle>Регистрация</PageTitle>
+<h1>Регистрация пассажира</h1>
+<p>Роль диспетчера через эту форму получить нельзя.</p>
+<StatusNote Message="@_error" />
+<EditForm Model="_form" OnValidSubmit="Submit">
+    <DataAnnotationsValidator />
+    <ValidationSummary />
+    <label>Имя <InputText @bind-Value="_form.FullName" /></label>
+    <label>Email <InputText @bind-Value="_form.Email" /></label>
+    <label>Пароль <InputText type="password" @bind-Value="_form.Password" /></label>
+    <button type="submit" disabled="@_busy">@(_busy ? "Регистрация..." : "Зарегистрироваться")</button>
+</EditForm>
+
+@code {
+    private readonly RegisterForm _form = new();
+    private string? _error;
+    private bool _busy;
+
+    private async Task Submit()
+    {
+        _busy = true;
+        _error = null;
+        try
+        {
+            var result = await Api.RegisterAsync(_form, CancellationToken.None);
+            _form.Password = "";
+            await Session.SignInAsync(result);
+            Navigation.NavigateTo("/bookings");
+        }
+        catch (ApiCallException exception)
+        {
+            _error = exception.Message;
+        }
+        finally
+        {
+            _busy = false;
+        }
+    }
+}

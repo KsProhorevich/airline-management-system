@@ -1,0 +1,79 @@
+@page "/passengers"
+@inject AirlineApiClient Api
+@inject AuthSession Session
+
+<PageTitle>Пассажиры</PageTitle>
+<h1>Пассажиры</h1>
+@if (!Session.IsDispatcher)
+{
+    <p>Список пассажиров доступен только диспетчеру. Пароли и токены не показываются.</p>
+}
+else
+{
+    <label>Поиск <input @bind="_search" @bind:event="oninput" /></label>
+    <button type="button" @onclick="Load">Найти</button>
+    <StatusNote Message="@_message" />
+    @if (_loading)
+    {
+        <p>Загрузка...</p>
+    }
+    else if (_items.Count == 0)
+    {
+        <p>Пассажиры не найдены.</p>
+    }
+    else
+    {
+        <table>
+            <thead><tr><th>Имя</th><th>Email</th><th>Создан</th></tr></thead>
+            <tbody>
+                @foreach (var passenger in _items)
+                {
+                    <tr>
+                        <td>@passenger.FullName</td>
+                        <td>@passenger.Email</td>
+                        <td>@passenger.CreatedAt.ToString("u")</td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    }
+}
+
+@code {
+    private string? _search;
+    private List<PassengerItem> _items = [];
+    private string? _message;
+    private bool _loading = true;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await Session.LoadAsync();
+        if (Session.IsDispatcher)
+        {
+            await Load();
+        }
+        else
+        {
+            _loading = false;
+        }
+    }
+
+    private async Task Load()
+    {
+        _loading = true;
+        _message = null;
+        try
+        {
+            var page = await Api.ListPassengersAsync(_search, CancellationToken.None);
+            _items = page.Items;
+        }
+        catch (ApiCallException exception)
+        {
+            _message = exception.Message;
+        }
+        finally
+        {
+            _loading = false;
+        }
+    }
+}

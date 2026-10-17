@@ -1,0 +1,35 @@
+@page "/aircraft/{Id:guid}"
+@inject AirlineApiClient Api
+
+<PageTitle>Самолёт</PageTitle>
+<h1>Самолёт</h1>
+<StatusNote Message="@_message" />
+@if (_item is not null)
+{
+    <dl>
+        <dt>Регистрация</dt><dd>@_item.Registration</dd>
+        <dt>Модель</dt><dd>@_item.Model</dd>
+        <dt>Вместимость</dt><dd>@_item.SeatCapacity</dd>
+    </dl>
+    <p><a href="@($"/flights?aircraft={_item.Id}")">Рейсы этого судна в общем списке задаются фильтром API aircraftId. Откройте расписание.</a></p>
+}
+
+@code {
+    [Parameter]
+    public Guid Id { get; set; }
+
+    private AircraftItem? _item;
+    private string? _message;
+
+    protected override async Task OnParametersSetAsync()
+    {
+        try
+        {
+            _item = await Api.GetAircraftAsync(Id, CancellationToken.None);
+        }
+        catch (ApiCallException exception)
+        {
+            _message = exception.Message;
+        }
+    }
+}

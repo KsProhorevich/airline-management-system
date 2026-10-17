@@ -1,0 +1,58 @@
+name: ci
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  build-test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 8.0.x
+      - name: Restore
+        run: dotnet restore AirlineApi.sln
+      - name: Build
+        run: dotnet build AirlineApi.sln --no-restore -c Release
+      - name: Test
+        run: dotnet test AirlineApi.sln --no-build -c Release
+      - name: Publish
+        run: |
+          dotnet publish AirlineApi/AirlineApi.csproj -c Release -o artifacts/api
+          dotnet publish AirlineClient/AirlineClient.csproj -c Release -o artifacts/client
+      - uses: actions/upload-artifact@v4
+        with:
+          name: airline-build
+          path: artifacts
+
+  publish-images:
+    if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master')
+    needs: build-test
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: AirlineApi/Dockerfile
+          push: true
+          tags: ghcr.io/${{ github.repository }}/airline-api:latest
+      - uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: AirlineClient/Dockerfile
+          push: true
+          tags: ghcr.io/${{ github.repository }}/airline-client:latest

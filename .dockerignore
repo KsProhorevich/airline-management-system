@@ -1,0 +1,16 @@
+**/bin/
+**/obj/
+**/.git/
+**/.vs/
+**/.idea/
+**/*.db
+**/*.db-shm
+**/*.db-wal
+**/App_Data/
+**/.env
+**/appsettings.*.local.json
+**/appsettings.Local.json
+.github/
+docs/
+README.md
+*.md

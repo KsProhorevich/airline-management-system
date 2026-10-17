@@ -1,0 +1,118 @@
+@page "/bookings"
+@inject AirlineApiClient Api
+@inject AuthSession Session
+
+<PageTitle>Бронирования</PageTitle>
+<h1>Бронирования</h1>
+@if (!Session.IsAuthenticated)
+{
+    <p><a href="/login">Войдите</a>, чтобы увидеть бронирования.</p>
+}
+else
+{
+    <p><a href="/bookings/new">Новое бронирование</a></p>
+    <StatusNote Message="@_message" />
+    @if (_loading)
+    {
+        <p>Загрузка...</p>
+    }
+    else if (_items.Count == 0)
+    {
+        <p>Бронирований нет.</p>
+    }
+    else
+    {
+        <table>
+            <thead><tr><th>Рейс</th><th>Пассажир</th><th>Места</th><th>Статус</th><th></th></tr></thead>
+            <tbody>
+                @foreach (var booking in _items)
+                {
+                    <tr>
+                        <td><a href="@($"/bookings/{booking.Id}")">@booking.FlightNumber</a></td>
+                        <td>@booking.PassengerName</td>
+                        <td>@booking.SeatCount</td>
+                        <td>@booking.Status</td>
+                        <td>
+                            @if (booking.Status != "Cancelled")
+                            {
+                                <button type="button" @onclick="() => Cancel(booking.Id)">Отменить</button>
+                            }
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+        @if (Session.IsDispatcher && _totalPages > 1)
+        {
+            <Pager Page="_page" TotalPages="_totalPages" PageChanged="ChangePage" />
+        }
+    }
+}
+
+@code {
+    private List<BookingItem> _items = [];
+    private string? _message;
+    private bool _loading = true;
+    private int _page = 1;
+    private int _totalPages = 1;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await Session.LoadAsync();
+        if (Session.IsAuthenticated)
+        {
+            await Load();
+        }
+        else
+        {
+            _loading = false;
+        }
+    }
+
+    private async Task ChangePage(int page)
+    {
+        _page = page;
+        await Load();
+    }
+
+    private async Task Load()
+    {
+        _loading = true;
+        _message = null;
+        try
+        {
+            if (Session.IsDispatcher)
+            {
+                var page = await Api.ListBookingsAsync(_page, CancellationToken.None);
+                _items = page.Items;
+                _totalPages = page.TotalPages;
+            }
+            else
+            {
+                _items = await Api.ListMyBookingsAsync(CancellationToken.None);
+                _totalPages = 1;
+            }
+        }
+        catch (ApiCallException exception)
+        {
+            _message = exception.Message;
+        }
+        finally
+        {
+            _loading = false;
+        }
+    }
+
+    private async Task Cancel(Guid id)
+    {
+        try
+        {
+            await Api.CancelBookingAsync(id, CancellationToken.None);
+            await Load();
+        }
+        catch (ApiCallException exception)
+        {
+            _message = exception.Message;
+        }
+    }
+}
